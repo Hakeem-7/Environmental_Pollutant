@@ -46,7 +46,7 @@ cor(y)
 ```{r}
 # sum(is.na(x))
 # names(x)
-cor(x[,-c(1:5,18)]) #Same task as the previous chunk.
+cor(x[,-c(1:5,18)]) #Performs same task as the previous chunk.
 ```
 
 
@@ -60,10 +60,13 @@ cor(x[,-c(1:5,18)]) #Same task as the previous chunk.
 #Complete Case Analysis (Delete missing rows)
 
 ```{r}
-pmcomplete = pm[complete.cases(pm),]
-fit.lm = lm(PM2.5~TEMP+PRES+DEWP+RAIN+WSPM, data = x)
-summary(fit.lm)
+pmcomplete = pm[complete.cases(pm),] # To reduce strings in the worksheet, fine tune the original string as shown below. 
+pm<-na.omit(pm) #same result as using "pmcomplete."
+
+fit.lm = lm(PM2.5~TEMP+PRES+DEWP+RAIN+WSPM, data = pm) #Other pollutants were excluded from the linear regression model.
+summary(fit.lm) 
 ```
+
 
 Multiple Imputation(MI)
 ```{r}
