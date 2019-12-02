@@ -68,107 +68,103 @@ summary(fit.lm)
 ```
 
 
-Multiple Imputation(MI)
+## Multiple Imputation(MI)
+
 ```{r}
 library(mice)
 data(pm,package="VIM")
-imp <- mice(pm, seed=1234)
+imp <- mice(pm, seed=1)
 fit <- with(imp, lm(PM2.5~PM10+SO2+NO2+CO+O3+TEMP+PRES+DEWP+RAIN+WSPM))
 pooled <- pool(fit)
 summary(pooled)
 summary(imp)
 ```
+
+
 ```{r}
 comp1=complete(imp, action=1)
-comp1
+comp1 #I'd suggest you add comments to the multiple imputation analysis for future reference.
 ```
 
 
 
-
-
-## Exploratory Data Analysis (EDA)
 ```{r}
-require(lattice)
-require(ggplot2)
-pairs(pmcomplete[6:15], pch = 5)
-```
-
-
-
-
-```{r}
-wind1 <- ifelse(pmcomplete$wd == "N", 1, 0)
-wind2 <- ifelse(pmcomplete$wd == "NNW", 1, 0)
-wind3 <- ifelse(pmcomplete$wd == "NW", 1, 0)
-wind4 <- ifelse(pmcomplete$wd == "WNW", 1, 0)
-wind5 <- ifelse(pmcomplete$wd == "W", 1, 0)
-wind6 <- ifelse(pmcomplete$wd == "NNE", 1, 0)
-wind7 <- ifelse(pmcomplete$wd == "NE", 1, 0)
-wind8 <- ifelse(pmcomplete$wd == "ENE", 1, 0)
+wind1 <- ifelse(pm$wd == "N", 1, 0)
+wind2 <- ifelse(pm$wd == "NNW", 1, 0)
+wind3 <- ifelse(pm$wd == "NW", 1, 0)
+wind4 <- ifelse(pm$wd == "WNW", 1, 0)
+wind5 <- ifelse(pm$wd == "W", 1, 0)
+wind6 <- ifelse(pm$wd == "NNE", 1, 0)
+wind7 <- ifelse(pm$wd == "NE", 1, 0)
+wind8 <- ifelse(pm$wd == "ENE", 1, 0)
 wind = wind1+wind2+wind3+wind4+wind5+wind6+wind7+wind8
+# View(wind)
 ```
 
 
 
 ```{r}
-pmain = cbind(pmcomplete, wind)
-```
-
-```{r}
-pmmain = pmain[, c(6:15, 17, 19)]
-```
-
-
-
-
-```{r}
-cor(pmmain)
+pm.v1 = cbind(pm, wind)
+# names(pm.v1)
+pm.v2 = pm.v1[,-c(1:5,7:11,16,18)]
+# View(pm.v2)
+cor(pm.v2)
 ```
 
 
-
-
-```{r}
-# pairs(pmmain)
-```
-
-
+##Sample Splitting
 
 ```{r}
+attach(pm.v2)
 library(glmnet)
 set.seed(6000)
-n = nrow(pmmain)
+n = nrow(pm.v2)
 trainIndex = sample(1:n, size = round(0.7*n), replace = FALSE)
-train = pmmain[trainIndex, ]
-test = pmmain[-trainIndex, ]
-X = model.matrix(PM2.5 ~., pmmain)[,-1]
-Y = pmmain$PM2.5
+train = pm.v2[trainIndex, ]
+test = pm.v2[-trainIndex, ]
+X = model.matrix(PM2.5 ~., pm.v2)[,-1]
+Y = pm.v2$PM2.5
+```
+
+
+## Linear Regression
+
+```{r}
+fit.lm = lm(PM2.5~., data = pm.v2) #Other pollutants were excluded from the linear regression model.
+m = summary(fit.lm)
+
+#MSE computation
+
+mse <- function(m){
+  cbind("MSE of the Linear Regression Model is = ", round(mean(m$residuals^2), 0))
+}
+mse(m)
+
+# Linear regression model suggests that "Temp" and "Wind Direction" have the greatest impact on the pollutatant pm2.5
 ```
 
 
 
-Ridge regression
+## Ridge regression
+
 ```{r}
 ridge.mod = glmnet(X[trainIndex, ], Y[trainIndex], alpha =0)
-```
 
-With cross validation
-```{r}
+#With cross validation
+
 library(boot)
 set.seed(1)
 cvout = cv.glmnet(X[trainIndex, ], Y[trainIndex], alpha = 0)
 bestlam0 = cvout$lambda.min
 bestlam0
-```
-The test error associated to best lambda is with cross validation is
-```{r}
-ridge.pred = predict(ridge.mod, s=bestlam0, newx=X[-trainIndex, ])
-ridgeerror = mean((ridge.pred - Y[-trainIndex])^2)
-ridgeerror
-```
 
-```{r}
+#Accuracy evaluation
+
+ridge.pred = predict(ridge.mod, s=bestlam0, newx=X[-trainIndex, ])
+round(mean((ridge.pred - Y[-trainIndex])^2),0)
+
+#MSE is approx 5000.
+
 coef(ridge.mod)[,bestlam0]
 ```
 
@@ -177,47 +173,43 @@ coef(ridge.mod)[,bestlam0]
 ## Lasso regression
 ```{r}
 lasso.mod = glmnet(X[trainIndex, ], Y[trainIndex], alpha =1)
-```
 
-With cross validation
-```{r}
+#With cross validation
+
 library(boot)
 set.seed(1)
 cvout1 = cv.glmnet(X[trainIndex, ], Y[trainIndex], alpha = 1)
 bestlam1 = cvout1$lambda.min
 bestlam1
-```
-The test error associated to best lambda is with cross validation is
-```{r}
+
+# Prediction Accuracy
+
+
 lasso.pred = predict(lasso.mod, s = bestlam1, newx=X[-trainIndex, ])
-lassoerror = mean((lasso.pred - Y[-trainIndex])^2)
-lassoerror
+round(mean((lasso.pred - Y[-trainIndex])^2),0)
+
+#MSE is approx 4971.
+
+#Coefficients
+
+out=glmnet(X,Y,alpha =1, lambda = bestlam1)
+lassocoef= predict (out ,type ="coefficients",s=bestlam1 )[1:7,]
+lassocoef #This suggests that all meteorological predictors considered in the regression analysis are relevant.
 ```
 
-The Coefficients.
-
-```{r}
-out=glmnet(X,Y,alpha =1, lambda =)
-lassocoef= predict (out ,type ="coefficients",s=bestlam1 )[1:11,]
-lassocoef
-```
-
-There are only four (4) nonzero coefficient estimates.
 
 
-# Decision Trees
-
-## Bagging & Random Forest
+# Decision Trees: Bagging,Random Forest, and Boosting
 
 ```{r}
 library(randomForest)
 set.seed(6000)
-smpl.size <- floor(0.5*nrow(pmmain))
-train <- sample(seq_len(nrow(pmmain)), size = smpl.size)
-smp.test <- pmmain[-train, ]
+smpl.size <- floor(0.5*nrow(pm.v2))
+train <- sample(seq_len(nrow(pm.v2)), size = smpl.size)
+smp.test <- pm.v2[-train, ]
 pm2.5.test<-PM2.5[-train]
 
-bag.pm<- randomForest(PM2.5~.,data = pmmain, subset = train, mtry = 11, importance = TRUE) #m=p
+bag.pm<- randomForest(PM2.5~.,data = pm.v2, subset = train, mtry = 6, importance = TRUE) #m=p
 bag.pm
 
 #Testing error/Performance accuracy of bagging
@@ -225,18 +217,20 @@ bag.pm
 yhat.bag<-predict(bag.pm, newdata = smp.test)
 plot(yhat.bag, pm2.5.test)
 abline(0,1, col = 2, lwd = 2)
-mean((yhat.bag - pm2.5.test)^2) #test MSE of Bagging
+round(mean((yhat.bag - pm2.5.test)^2),0) #test MSE of Bagging is 3605
+
 
 
 #RandomForest
+
 # By default, randomForest() uses p/3 variables when building a random forest of regression trees, and √p variables when building a random forest of classiﬁcation trees. 
 
-#Using p = 5
+#Using p = 3
 
 set.seed(6000)
-rf.pm<- randomForest(PM2.5~.,data = pmmain, subset = train, mtry = 5, importance = TRUE) 
+rf.pm<- randomForest(PM2.5~.,data = pm.v2, subset = train, mtry = 3, importance = TRUE) 
 yhat.rf<-predict(rf.pm, newdata = smp.test)
-mean((yhat.rf - pm2.5.test)^2)
+round(mean((yhat.rf - pm2.5.test)^2), 0) #test MSE of Random Forest is 3569
 
 importance(rf.pm)
 
@@ -249,23 +243,23 @@ varImpPlot(rf.pm)
 # install.packages("gbm")
 library(gbm)
 set.seed(6000)
-boost.pm<- gbm(PM2.5~.,data = pmmain[train,], distribution = "gaussian", n.trees = 5000, interaction.depth = 4)
+boost.pm<- gbm(PM2.5~.,data = pm.v2[train,], distribution = "gaussian", n.trees = 2000, interaction.depth = 4)
 summary(boost.pm)
 
 par(mfrow=c(1,2))
-plot(boost.pm ,i="CO")
-plot(boost.pm ,i="NO2")
+plot(boost.pm ,i="TEMP")
+plot(boost.pm ,i="PRES")
 
 #Testing error/Performance accuracy of boosting
 
-yhat.boost<-predict(boost.pm, newdata = smp.test, n.trees = 5000)
+yhat.boost<-predict(boost.pm, newdata = smp.test, n.trees = 2000)
 
-classVariables = sapply(pmmain, function(x) class(x))
+classVariables = sapply(pm.v2, function(x) class(x))
 classVariables
 
 mean((yhat.boost - pm2.5.test)^2) #MSE = 424.1 when n.trees = 4000, and MSE= 423.3 when n.trees = 5000.
 
-#Is there a means of finding covergence point like a monte-carlo analysis?
+#Is there a means of finding covergence point like a monte-carlo analysis to determine the optimum ntrees?
 
 ```
 
