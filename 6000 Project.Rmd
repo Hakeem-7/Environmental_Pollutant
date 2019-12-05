@@ -229,12 +229,35 @@ round(mean((yhat.bag - pm2.5.test)^2),0) #test MSE of Bagging is 3605
 
 set.seed(6000)
 rf.pm<- randomForest(PM2.5~.,data = pm.v2, subset = train, mtry = 3, importance = TRUE) 
+rf.pm
 yhat.rf<-predict(rf.pm, newdata = smp.test)
 round(mean((yhat.rf - pm2.5.test)^2), 0) #test MSE of Random Forest is 3569
 
 importance(rf.pm)
 
 varImpPlot(rf.pm)
+
+
+library(ggplot2)
+library(magrittr)
+library(dplyr) #Learn more about this library
+# feat_imp_df<- importance(rf.pm) %>% #Piping a dataframe from VarImpPlot of Random Forest.
+#   data.frame() %>%
+#   mutate(feature = row.names(.))
+# 
+# #dataframe plot
+# ggplot(feat_imp_df, aes(x = reorder(feature, MeanDecreaseGini), 
+#                         y = MeanDecreaseGini)) + 
+#   geom_bar(stat='identity') +
+#     coord_flip() +
+#     theme_classic() +
+#     labs(
+#       x     = "Feature",
+#       y     = "Importance",
+#       title = "Feature Importance: <Model>"
+#     )
+
+
 ```
 
 ## Boosting
@@ -257,7 +280,7 @@ yhat.boost<-predict(boost.pm, newdata = smp.test, n.trees = 2000)
 classVariables = sapply(pm.v2, function(x) class(x))
 classVariables
 
-mean((yhat.boost - pm2.5.test)^2) #MSE = 424.1 when n.trees = 4000, and MSE= 423.3 when n.trees = 5000.
+mean((yhat.boost - pm2.5.test)^2) #MSE = 3883 when n.trees = 4000, and MSE= 423.3 when n.trees = 2000 
 
 #Is there a means of finding covergence point like a monte-carlo analysis to determine the optimum ntrees?
 
